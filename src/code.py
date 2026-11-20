@@ -6,6 +6,8 @@ import time
 pc = adafruit_pycamera.PyCamera()
 pc.resolution = 1 # 320x240
 
+MUTED = True
+
 # bitmap
 bmp = displayio.Bitmap(320, 240, 65535)
 
@@ -30,9 +32,13 @@ def toggle(cur, a, b):
   else:
     return a
 
+def tone(freq, dur):
+  if not MUTED:
+    pc.tone(freq, dur)
+
 # startup
 print("Hello World!")
-pc.tone(300, 0.3)
+tone(300, 0.3)
 
 while True:
   # preview
@@ -50,38 +56,38 @@ while True:
     print("taking photo")
     try:
       pc.capture_into_bitmap(bmp)
-      pc.tone(600, 0.1)
+      tone(600, 0.1)
       pc.display_message("photo taken", color=0xffffff, scale=2)
       pc.live_preview_mode()
       time.sleep(1)
     except:
-      pc.tone(100, 0.1)
+      tone(100, 0.1)
       pc.display_message("error", color=0xff0000, scale=2)
       time.sleep(1)
 
   if pc.up.fell:
     print("up")
-    pc.tone(500, 0.1)
+    tone(500, 0.1)
     pc.led_level = cycle(pc.led_level, 4)
   elif pc.down.fell:
     print("down")
-    pc.tone(500, 0.1)
+    tone(500, 0.1)
     pc.led_level = cycle(pc.led_level, 4, True)
   elif pc.left.fell:
     print("left")
-    pc.tone(500, 0.1)
+    tone(500, 0.1)
     pc.led_color = cycle(pc.led_color, 7, True)
   elif pc.right.fell:
     print("right")
-    pc.tone(500, 0.1)
+    tone(500, 0.1)
     pc.led_color = cycle(pc.led_color, 7)
   elif pc.select.fell:
     print("select")
-    pc.tone(500, 0.1)
+    tone(500, 0.1)
     shape = cycle(shape, len(shapes) - 1)
     print("halftone shape: " + shapes[shape])
   elif pc.ok.fell:
     print("ok")
-    pc.tone(500, 0.1)
+    tone(500, 0.1)
     # normal / b&w
     pc.effect = toggle(pc.effect, 0, 2)
