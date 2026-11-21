@@ -10,12 +10,13 @@ pc = adafruit_pycamera.PyCamera()
 pc.resolution = 0 # 240x240
 
 MUTED = False
+SCALE_FACTOR = 2 # halftoned image is scaled up
 
 display = board.DISPLAY
 
 # bitmap - RGB565
-bmp = displayio.Bitmap(240, 240, 65535)
-cmy = displayio.Bitmap(240, 240, 8)
+bmp = displayio.Bitmap(display.width, display.height, 65535)
+cmy = displayio.Bitmap(display.width * SCALE_FACTOR, display.height * SCALE_FACTOR, 8)
 
 pal_cmy = displayio.Palette(8)
 pal_cmy[0] = 0xcccccc # 000 white
@@ -104,11 +105,11 @@ def tone(freq, dur):
 def process(bitmap):
   # halftone dimensions
   sz = int(len(halftones[0][0]) ** 0.5)
-  for x in range(bitmap.width / sz):
-    for y in range(bitmap.height / sz):
+  for x in range(bitmap.width / sz * SCALE_FACTOR):
+    for y in range(bitmap.height / sz * SCALE_FACTOR):
       # top left coord of 4x4 square from original bitmap
-      rx = sz * x
-      ry = sz * y
+      rx = int(sz * x / SCALE_FACTOR)
+      ry = int(sz * y / SCALE_FACTOR)
       total = 0
       pixel = bitmap[rx, ry]
       # 16 bit rgb - 0bRRRRRGGGGGGBBBBB (5R, 6G, 5B)
@@ -116,13 +117,13 @@ def process(bitmap):
       g = (pixel & 0b0000011111100000) >> 5
       b = pixel & 0b0000000000011111
       # convert to cmy: scale based on # of shades
-      SCALE = len(halftones[0]) - 1
-      c = int(SCALE * (1 - r / 31))
-      m = int(SCALE * (1 - g / 63))
-      y = int(SCALE * (1 - b / 31))
+      max_idx = len(halftones[0]) - 1
+      c = int(max_idx * (1 - r / 31))
+      m = int(max_idx * (1 - g / 63))
+      y = int(max_idx * (1 - b / 31))
 
       square = [4 * vc + 2 * vm + 1 * vy for vc, vm, vy in zip(halftones[shape][c], halftones[shape][m], halftones[shape][y])]
-      bitmaptools.arrayblit(cmy, bytes(square), rx, ry, rx + sz, ry + sz)
+      bitmaptools.arrayblit(cmy, bytes(square), rx, ry, int(rx + sz / SCALE_FACTOR), int(ry + sz / SCALE_FACTOR))
       print(square)
       print("({}, {}): {}; rgb({}, {}, {}); cmy({}, {}, {})".format(x, y, pixel, r, g, b, c, m, y))
 
