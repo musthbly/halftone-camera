@@ -1,140 +1,81 @@
 import adafruit_pycamera
+import board
 import displayio
 import bitmaptools
+import bitmapfilter
 import time
 
 # camera settings
 pc = adafruit_pycamera.PyCamera()
-pc.resolution = 1 # 320x240
+pc.resolution = 0 # 240x240
 
 MUTED = False
 
-# bitmap - 0bRRRRRGGGGGGBBBBB
-bmp = displayio.Bitmap(320, 240, 65535)
-cyan = displayio.Bitmap(320, 240, 2)
-magenta = displayio.Bitmap(320, 240, 2)
-yellow = displayio.Bitmap(320, 240, 2)
+display = board.DISPLAY
+
+# bitmap - RGB565
+bmp = displayio.Bitmap(240, 240, 65535)
+cmy = displayio.Bitmap(240, 240, 8)
+
+pal_cmy = displayio.Palette(8)
+pal_cmy[0] = 0xffffff # 000 white
+pal_cmy[1] = 0xffff00 # 001 yellow
+pal_cmy[2] = 0xff00ff # 010 magenta
+pal_cmy[3] = 0xff0000 # 011 red
+pal_cmy[4] = 0x00ffff # 100 cyan
+pal_cmy[5] = 0x00ff00 # 101 green
+pal_cmy[6] = 0x0000ff # 110 blue
+pal_cmy[7] = 0x000000 # 111 black
+
+tile_cmy = displayio.TileGrid(cmy, pixel_shader=pal_cmy)
+group = displayio.Group(y = 32)
+group.append(tile_cmy)
+
+display.root_group.append(group)
 
 # halftone shapes, light to dark (0:bg, 1:fg)
 halftones = [
-  # 0 = circle
-  [
-    bytes([
-      0, 0, 0, 0, 0,
-      0, 0, 0, 0, 0,
-      0, 0, 0, 0, 0,
-      0, 0, 0, 0, 0,
-      0, 0, 0, 0, 0
-    ]),
-    bytes([
-      0, 0, 0, 0, 0,
-      0, 0, 0, 0, 0,
-      0, 0, 1, 0, 0,
-      0, 0, 0, 0, 0,
-      0, 0, 0, 0, 0
-    ]),
-    bytes([
-      0, 0, 0, 0, 0,
-      0, 1, 1, 0, 0,
-      0, 1, 1, 0, 0,
-      0, 0, 0, 0, 0,
-      0, 0, 0, 0, 0
-    ]),
-    bytes([
-      0, 0, 0, 0, 0,
-      0, 1, 1, 0, 0,
-      0, 1, 1, 1, 0,
-      0, 0, 1, 1, 0,
-      0, 0, 0, 0, 0
-    ]),
-    bytes([
-      0, 0, 0, 0, 0,
-      0, 1, 1, 1, 0,
-      0, 1, 1, 1, 0,
-      0, 1, 1, 1, 0,
-      0, 0, 0, 0, 0
-    ]),
-    bytes([
-      0, 1, 1, 0, 0,
-      1, 1, 1, 1, 0,
-      1, 1, 1, 1, 0,
-      0, 1, 1, 0, 0,
-      0, 0, 0, 0, 0
-    ]),
-    bytes([
-      0, 0, 1, 1, 0,
-      0, 1, 1, 1, 1,
-      1, 1, 1, 1, 1,
-      1, 1, 1, 1, 1,
-      0, 1, 1, 1, 1
-    ]),
-    bytes([
-      1, 1, 1, 1, 1,
-      1, 1, 1, 1, 1,
-      1, 1, 1, 1, 1,
-      1, 1, 1, 1, 1,
-      1, 1, 1, 1, 1
-    ])
-  ],
+  # 0 = square
+  [[0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0],
+
+   [0, 0, 0, 0,
+    0, 1, 1, 0,
+    0, 1, 1, 0,
+    0, 0, 0, 0],
+
+   [0, 1, 1, 0,
+    1, 1, 1, 1,
+    1, 1, 1, 1,
+    0, 1, 1, 0],
+
+   [1, 1, 1, 1,
+    1, 1, 1, 1,
+    1, 1, 1, 1,
+    1, 1, 1, 1]],
+
   # 1 = line
-  [
-    bytes([
-      0, 0, 0, 0, 0,
-      0, 0, 0, 0, 0,
-      0, 0, 0, 0, 0,
-      0, 0, 0, 0, 0,
-      0, 0, 0, 0, 0
-    ]),
-    bytes([
-      0, 0, 0, 0, 0,
-      0, 0, 0, 1, 0,
-      0, 0, 1, 0, 0,
-      0, 0, 0, 0, 0,
-      0, 0, 0, 0, 0
-    ]),
-    bytes([
-      0, 0, 0, 0, 0,
-      0, 0, 0, 1, 0,
-      0, 0, 1, 1, 0,
-      0, 1, 1, 0, 0,
-      0, 0, 0, 0, 0
-    ]),
-    bytes([
-      0, 0, 0, 0, 0,
-      0, 0, 1, 1, 0,
-      0, 1, 1, 1, 0,
-      0, 1, 1, 0, 0,
-      0, 0, 0, 0, 0
-    ]),
-    bytes([
-      0, 0, 0, 1, 1,
-      0, 0, 1, 1, 1,
-      0, 1, 1, 1, 0,
-      0, 1, 1, 0, 0,
-      0, 0, 0, 0, 0
-    ]),
-    bytes([
-      0, 0, 1, 1, 1,
-      0, 1, 1, 1, 1,
-      0, 1, 1, 1, 0,
-      1, 1, 1, 1, 0,
-      1, 1, 1, 0, 0
-    ]),
-    bytes([
-      0, 1, 1, 1, 1,
-      0, 1, 1, 1, 1,
-      1, 1, 1, 1, 1,
-      1, 1, 1, 1, 0,
-      1, 1, 1, 1, 0
-    ]),
-    bytes([
-      1, 1, 1, 1, 1,
-      1, 1, 1, 1, 1,
-      1, 1, 1, 1, 1,
-      1, 1, 1, 1, 1,
-      1, 1, 1, 1, 1
-    ])
-  ]
+  [[0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0],
+
+   [0, 0, 0, 1,
+    0, 0, 1, 0,
+    0, 1, 0, 0,
+    1, 0, 0, 0],
+
+   [0, 0, 1, 1,
+    0, 1, 1, 1,
+    1, 1, 1, 0,
+    1, 1, 0, 0],
+
+   [1, 1, 1, 1,
+    1, 1, 1, 1,
+    1, 1, 1, 1,
+    1, 1, 1, 1]]
 ]
 shape = 0
 
@@ -161,29 +102,29 @@ def tone(freq, dur):
     pc.tone(freq, dur)
 
 def process(bitmap):
-  for x in range(bitmap.width / 5):
-    for y in range(bitmap.height / 5):
-      # top left coord of 5x5 square from original bitmap
-      rx = 5 * x
-      ry = 5 * y
+  # halftone dimensions
+  sz = int(len(halftones[0][0]) ** 0.5)
+  for x in range(bitmap.width / sz):
+    for y in range(bitmap.height / sz):
+      # top left coord of 4x4 square from original bitmap
+      rx = sz * x
+      ry = sz * y
       total = 0
-      for sx in range(rx, rx + 5):
-        for sy in range(ry, ry + 5):
-          total += bitmap[sx, sy]
-      avg = int(total / 25)
+      pixel = bitmap[rx, ry]
       # 16 bit rgb - 0bRRRRRGGGGGGBBBBB (5R, 6G, 5B)
-      r = (avg & 0b1111100000000000) >> 11
-      g = (avg & 0b0000011111100000) >> 5
-      b = avg & 0b0000000000011111
+      r = (pixel & 0b1111100000000000) >> 11
+      g = (pixel & 0b0000011111100000) >> 5
+      b = pixel & 0b0000000000011111
       # convert to cmy: scale based on # of shades
       SCALE = len(halftones[0]) - 1
-      c = int(SCALE * (1 - r / (2 ** 5)))
-      m = int(SCALE * (1 - g / (2 ** 6)))
-      y = int(SCALE * (1 - b / (2 ** 5)))
-      bitmaptools.arrayblit(cyan, halftones[shape][c], rx, ry, rx + 5, ry + 5)
-      bitmaptools.arrayblit(magenta, halftones[shape][m], rx, ry, rx + 5, ry + 5)
-      bitmaptools.arrayblit(yellow, halftones[shape][y], rx, ry, rx + 5, ry + 5)
-      print("({}, {}): {}; rgb({}, {}, {}); cmy({}, {}, {})".format(x, y, avg, r, g, b, c, m, y))
+      c = int(SCALE * (1 - r / 31))
+      m = int(SCALE * (1 - g / 63))
+      y = int(SCALE * (1 - b / 31))
+
+      square = [4 * vc + 2 * vm + 1 * vy for vc, vm, vy in zip(halftones[shape][c], halftones[shape][m], halftones[shape][y])]
+      bitmaptools.arrayblit(cmy, bytes(square), rx, ry, rx + sz, ry + sz)
+      print(square)
+      print("({}, {}): {}; rgb({}, {}, {}); cmy({}, {}, {})".format(x, y, pixel, r, g, b, c, m, y))
 
 # startup
 print("Hello World!")
@@ -210,7 +151,7 @@ while True:
     tone(600, 0.1)
     pc.display_message("photo taken", color=0xffffff, scale=2)
     pc.live_preview_mode()
-    time.sleep(1)
+    time.sleep(3)
 
   if pc.up.fell:
     print("up")
@@ -231,8 +172,7 @@ while True:
   elif pc.select.fell:
     print("select")
     tone(500, 0.1)
-    shape = cycle(shape, len(shapes) - 1)
-    print("halftone shape: " + shapes[shape])
+    shape = cycle(shape, len(halftones) - 1)
   elif pc.ok.fell:
     print("ok")
     tone(500, 0.1)
