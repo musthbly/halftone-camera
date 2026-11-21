@@ -18,14 +18,14 @@ bmp = displayio.Bitmap(240, 240, 65535)
 cmy = displayio.Bitmap(240, 240, 8)
 
 pal_cmy = displayio.Palette(8)
-pal_cmy[0] = 0xffffff # 000 white
-pal_cmy[1] = 0xffff00 # 001 yellow
-pal_cmy[2] = 0xff00ff # 010 magenta
-pal_cmy[3] = 0xff0000 # 011 red
-pal_cmy[4] = 0x00ffff # 100 cyan
-pal_cmy[5] = 0x00ff00 # 101 green
-pal_cmy[6] = 0x0000ff # 110 blue
-pal_cmy[7] = 0x000000 # 111 black
+pal_cmy[0] = 0xcccccc # 000 white
+pal_cmy[1] = 0xcccc33 # 001 yellow
+pal_cmy[2] = 0xcc33cc # 010 magenta
+pal_cmy[3] = 0xcc3333 # 011 red
+pal_cmy[4] = 0x33cccc # 100 cyan
+pal_cmy[5] = 0x33cc33 # 101 green
+pal_cmy[6] = 0x3333cc # 110 blue
+pal_cmy[7] = 0x333333 # 111 black
 
 tile_cmy = displayio.TileGrid(cmy, pixel_shader=pal_cmy)
 group = displayio.Group(y = 32)
