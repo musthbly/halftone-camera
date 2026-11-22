@@ -138,15 +138,15 @@ while True:
 
   pc.keys_debounce()
 
+  # sd card
   if pc.card_detect.fell:
     print("sd card removed")
-    pc.display_message("unmounting sd card...", color=0xFFFFFF, scale=2)
+    pc.display_message("unmounting sd card...", color=0xffffff, scale=2)
     pc.unmount_sd_card()
     pc.display.refresh()
-
   if pc.card_detect.rose:
     print("sd card inserted")
-    pc.display_message("mounting sd card...", color=0xFFFFFF, scale=2)
+    pc.display_message("mounting sd card...", color=0xffffff, scale=2)
     pc.mount_sd_card()
     pc.display.refresh()
 
@@ -164,9 +164,11 @@ while True:
     process(bmp)
     tone(600, 0.1)
     pc.display_message("photo taken", color=0xffffff, scale=2)
+    time.sleep(0.5)
+    pc.display_message("saving...", color=0xffffff, scale=2)
     adafruit_bitmapsaver.save_pixels("/sd/{}.bmp".format(time.time()), cmy, pal_cmy)
-    pc.live_preview_mode()
-    time.sleep(3)
+    pc.display_message("done", color=0xffffff, scale=2)
+    time.sleep(0.5)
 
   if pc.up.fell:
     print("up")
@@ -188,6 +190,8 @@ while True:
     print("select")
     tone(500, 0.1)
     shape = cycle(shape, len(halftones) - 1)
+    pc.display_message("shape: {}".format(shape), color=0xffffff, scale=2)
+    time.sleep(0.5)
   elif pc.ok.fell:
     print("ok")
     tone(500, 0.1)
