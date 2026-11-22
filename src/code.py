@@ -1,4 +1,5 @@
 import adafruit_pycamera
+import adafruit_bitmapsaver
 import board
 import displayio
 import bitmaptools
@@ -107,7 +108,7 @@ def process(bitmap):
   sz = int(len(halftones[0][0]) ** 0.5)
   for x in range(bitmap.width / sz * SCALE_FACTOR):
     for y in range(bitmap.height / sz * SCALE_FACTOR):
-      # top left coord of 4x4 square from original bitmap
+      # top left coord of square from original bitmap
       rx = int(sz * x / SCALE_FACTOR)
       ry = int(sz * y / SCALE_FACTOR)
       total = 0
@@ -123,7 +124,7 @@ def process(bitmap):
       y = int(max_idx * (1 - b / 31))
 
       square = [4 * vc + 2 * vm + 1 * vy for vc, vm, vy in zip(halftones[shape][c], halftones[shape][m], halftones[shape][y])]
-      bitmaptools.arrayblit(cmy, bytes(square), rx, ry, int(rx + sz / SCALE_FACTOR), int(ry + sz / SCALE_FACTOR))
+      bitmaptools.arrayblit(cmy, bytes(square), rx * SCALE_FACTOR, ry * SCALE_FACTOR, int(rx * SCALE_FACTOR + sz), int(ry * SCALE_FACTOR + sz))
       print(square)
       print("({}, {}): {}; rgb({}, {}, {}); cmy({}, {}, {})".format(x, y, pixel, r, g, b, c, m, y))
 
@@ -136,6 +137,18 @@ while True:
   pc.blit(pc.continuous_capture())
 
   pc.keys_debounce()
+
+  if pc.card_detect.fell:
+    print("sd card removed")
+    pc.display_message("unmounting sd card...", color=0xFFFFFF, scale=2)
+    pc.unmount_sd_card()
+    pc.display.refresh()
+
+  if pc.card_detect.rose:
+    print("sd card inserted")
+    pc.display_message("mounting sd card...", color=0xFFFFFF, scale=2)
+    pc.mount_sd_card()
+    pc.display.refresh()
 
   # focus
   if pc.shutter.long_press:
@@ -151,6 +164,7 @@ while True:
     process(bmp)
     tone(600, 0.1)
     pc.display_message("photo taken", color=0xffffff, scale=2)
+    adafruit_bitmapsaver.save_pixels("/sd/{}.bmp".format(time.time()), cmy, pal_cmy)
     pc.live_preview_mode()
     time.sleep(3)
 
