@@ -14,9 +14,10 @@ SCALE_FACTOR = 2 # halftoned image is scaled up
 
 display = board.DISPLAY
 
-# bitmap - RGB565
+# bitmap - RGB565_SWAPPED
 bmp = displayio.Bitmap(display.width, display.height, 65535)
 cmy = displayio.Bitmap(display.width * SCALE_FACTOR, display.height * SCALE_FACTOR, 8)
+cc = displayio.ColorConverter(input_colorspace = displayio.Colorspace.RGB565_SWAPPED)
 
 pal_cmy = displayio.Palette(8)
 pal_cmy[0] = 0xcccccc # 000 white
@@ -31,7 +32,6 @@ pal_cmy[7] = 0x333333 # 111 black
 tile_cmy = displayio.TileGrid(cmy, pixel_shader=pal_cmy)
 group = displayio.Group(y = 32)
 group.append(tile_cmy)
-
 display.root_group.append(group)
 
 # halftone shapes, light to dark (0:bg, 1:fg)
@@ -111,8 +111,8 @@ def process(bitmap):
       rx = int(sz * x / SCALE_FACTOR)
       ry = int(sz * y / SCALE_FACTOR)
       total = 0
-      pixel = bitmap[rx, ry]
-      # 16 bit rgb - 0bRRRRRGGGGGGBBBBB (5R, 6G, 5B)
+      # convert swapped to RGB565
+      pixel = cc.convert(bitmap[rx, ry])
       r = (pixel & 0b1111100000000000) >> 11
       g = (pixel & 0b0000011111100000) >> 5
       b = pixel & 0b0000000000011111
