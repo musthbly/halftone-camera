@@ -1,2 +1,2 @@
-#!/bin/sh
-cp -R src/* /Volumes/CIRCUITPY
+#!/bin/zsh
+cp -R src/*.{py,bmp} /Volumes/CIRCUITPY
