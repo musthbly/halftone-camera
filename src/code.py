@@ -249,14 +249,13 @@ def process(bitmap):
       b = pixel & 0b0000000000011111
       # convert to cmy: scale based on # of shades
       max_idx = len(halftones[0]) - 1
-      c = int(max_idx * (1 - r / 31))
-      m = int(max_idx * (1 - g / 63))
-      y = int(max_idx * (1 - b / 31))
+      cyan = int(max_idx * (1 - r / 31))
+      magenta = int(max_idx * (1 - g / 63))
+      yellow = int(max_idx * (1 - b / 31))
 
-      square = [4 * vc + 2 * vm + 1 * vy for vc, vm, vy in zip(halftones[shape][c], halftones[shape][m], halftones[shape][y])]
+      square = [4 * vc + 2 * vm + 1 * vy for vc, vm, vy in zip(halftones[shape][cyan], halftones[shape][magenta], halftones[shape][yellow])]
       bitmaptools.arrayblit(cmy, bytes(square), rx * SCALE_FACTOR, ry * SCALE_FACTOR, int(rx * SCALE_FACTOR + sz), int(ry * SCALE_FACTOR + sz))
-      print(square)
-      print("({}, {}): {}; rgb({}, {}, {}); cmy({}, {}, {})".format(x, y, pixel, r, g, b, c, m, y))
+      print("{},{} RGB565:{} RGB:{},{},{} CMY:{},{},{} {}".format(x, y, pixel, r, g, b, cyan, magenta, yellow, square))
 
 # startup
 print("Hello World!")
