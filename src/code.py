@@ -16,8 +16,8 @@ SCALE_FACTOR = 2 # halftoned image is scaled up
 display = board.DISPLAY
 
 # bitmap - RGB565_SWAPPED
-bmp = displayio.Bitmap(display.width, display.height, 65535)
-cmy = displayio.Bitmap(display.width * SCALE_FACTOR, display.height * SCALE_FACTOR, 8)
+bmp = displayio.Bitmap(pc.camera.width, pc.camera.height, 65535)
+cmy = displayio.Bitmap(pc.camera.width * SCALE_FACTOR, pc.camera.height * SCALE_FACTOR, 8)
 cc = displayio.ColorConverter(input_colorspace = displayio.Colorspace.RGB565_SWAPPED)
 
 pal_cmy = displayio.Palette(8)
