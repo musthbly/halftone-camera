@@ -9,16 +9,16 @@ import time
 # camera settings
 pc = adafruit_pycamera.PyCamera()
 pc.resolution = 0 # 240x240
-
 MUTED = False
 SCALE_FACTOR = 2 # halftoned image is scaled up
+STATE = "take" # take, view
 
 display = board.DISPLAY
 
 # bitmap - RGB565_SWAPPED
 bmp = displayio.Bitmap(pc.camera.width, pc.camera.height, 65535)
 cmy = displayio.Bitmap(pc.camera.width * SCALE_FACTOR, pc.camera.height * SCALE_FACTOR, 8)
-cc = displayio.ColorConverter(input_colorspace = displayio.Colorspace.RGB565_SWAPPED)
+cc = displayio.ColorConverter(input_colorspace=displayio.Colorspace.RGB565_SWAPPED)
 
 pal_cmy = displayio.Palette(8)
 pal_cmy[0] = 0xf3ead9 # 000 white
@@ -30,8 +30,9 @@ pal_cmy[5] = 0x58a600 # 101 green
 pal_cmy[6] = 0x5300bb # 110 blue
 pal_cmy[7] = 0x25151d # 111 black
 
-tile_cmy = displayio.TileGrid(cmy, pixel_shader=pal_cmy)
-group = displayio.Group(y = 32)
+tile_cmy = displayio.TileGrid(cmy, pixel_shader=pal_cmy, width=1, height=1, tile_width=pc.camera.width, tile_height=pc.camera.height)
+
+group = displayio.Group(y=32)
 group.append(tile_cmy)
 display.root_group.append(group)
 
@@ -262,9 +263,6 @@ print("Hello World!")
 tone(300, 0.3)
 
 while True:
-  # preview
-  pc.blit(pc.continuous_capture())
-
   pc.keys_debounce()
 
   # sd card
@@ -279,50 +277,83 @@ while True:
     pc.mount_sd_card()
     pc.display.refresh()
 
-  # focus
-  if pc.shutter.long_press:
-    pc.display_message("focusing...", color=0xffffff, scale=2)
-    pc.autofocus()
-
-  # take photo
-  if pc.shutter.short_count:
-    print("taking photo")
-    tone(500, 0.1)
-    pc.display_message("processing...", color=0xffffff, scale=2)
-    pc.capture_into_bitmap(bmp)
-    process(bmp)
-    tone(600, 0.1)
-    pc.display_message("photo taken", color=0xffffff, scale=2)
-    time.sleep(0.5)
-    pc.display_message("saving...", color=0xffffff, scale=2)
-    adafruit_bitmapsaver.save_pixels("/sd/{}.bmp".format(time.time()), cmy, pal_cmy)
-    pc.display_message("done", color=0xffffff, scale=2)
-    time.sleep(0.5)
-
   if pc.up.fell:
     print("up")
     tone(500, 0.1)
-    pc.led_level = cycle(pc.led_level, 4)
   elif pc.down.fell:
     print("down")
     tone(500, 0.1)
-    pc.led_level = cycle(pc.led_level, 4, True)
   elif pc.left.fell:
     print("left")
     tone(500, 0.1)
-    pc.led_color = cycle(pc.led_color, 7, True)
   elif pc.right.fell:
     print("right")
     tone(500, 0.1)
-    pc.led_color = cycle(pc.led_color, 7)
   elif pc.select.fell:
     print("select")
     tone(500, 0.1)
-    shape = cycle(shape, len(halftones) - 1)
-    pc.display_message("shape: {}".format(shape), color=0xffffff, scale=2)
-    time.sleep(0.5)
   elif pc.ok.fell:
     print("ok")
     tone(500, 0.1)
-    # normal / b&w
-    pc.effect = toggle(pc.effect, 0, 2)
+
+  if STATE == "take":
+    # preview
+    pc.blit(pc.continuous_capture())
+
+    group.hidden = True
+
+    # focus
+    if pc.shutter.long_press:
+      pc.display_message("focusing...", color=0xffffff, scale=2)
+      pc.autofocus()
+
+    # take photo
+    if pc.shutter.short_count:
+      print("taking photo")
+      tone(500, 0.1)
+      pc.display_message("processing...", color=0xffffff, scale=2)
+      pc.capture_into_bitmap(bmp)
+      process(bmp)
+      tone(600, 0.1)
+      group.hidden = False
+      pc.display_message("press [ok]\nto continue", color=0xffffff, scale=2)
+      STATE = "view"
+
+    if pc.up.fell:
+      pc.led_level = cycle(pc.led_level, 4)
+    elif pc.down.fell:
+      pc.led_level = cycle(pc.led_level, 4, True)
+    elif pc.left.fell:
+      pc.led_color = cycle(pc.led_color, 7, True)
+    elif pc.right.fell:
+      pc.led_color = cycle(pc.led_color, 7)
+    elif pc.select.fell:
+      shape = cycle(shape, len(halftones) - 1)
+      pc.display_message("shape: {}".format(shape), color=0xffffff, scale=2)
+      time.sleep(0.5)
+    elif pc.ok.fell:
+      # normal / b&w
+      pc.effect = toggle(pc.effect, 0, 2)
+  elif STATE == "view":
+    if pc.ok.fell:
+      pc.display_message("saving...", color=0xffffff, scale=2)
+      adafruit_bitmapsaver.save_pixels("/sd/{}.bmp".format(time.time()), cmy, pal_cmy)
+      pc.display_message("photo saved\nto sd card", color=0xffffff, scale=2)
+      time.sleep(0.5)
+      STATE = "take"
+    elif pc.up.fell:
+      if tile_cmy[0] >= SCALE_FACTOR:
+        tile_cmy[0] -= SCALE_FACTOR
+        display.refresh()
+    elif pc.down.fell:
+      if tile_cmy[0] <= (SCALE_FACTOR ** 2 - SCALE_FACTOR - 1):
+        tile_cmy[0] += SCALE_FACTOR
+        display.refresh()
+    elif pc.left.fell:
+      if tile_cmy[0] % SCALE_FACTOR != 0:
+        tile_cmy[0] -= 1
+        display.refresh()
+    elif pc.right.fell:
+      if tile_cmy[0] % SCALE_FACTOR != SCALE_FACTOR - 1:
+        tile_cmy[0] += 1
+        display.refresh()
