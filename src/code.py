@@ -1,7 +1,9 @@
 import adafruit_pycamera
 import adafruit_bitmapsaver
+import adafruit_display_text
 import board
 import displayio
+import terminalio
 import bitmaptools
 import bitmapfilter
 import time
@@ -124,6 +126,14 @@ def process(bitmap):
       bitmaptools.arrayblit(cmy, bytes(square), rx * SCALE_FACTOR, ry * SCALE_FACTOR, int(rx * SCALE_FACTOR + sz), int(ry * SCALE_FACTOR + sz))
       print(f"{x:03},{y:02} 565:{pixel:05} RGB:{r:02},{g:02},{b:02} CMY:{cyan:02},{magenta:02},{yellow:02} {str(square).replace(' ','')}")
 
+def display_message(msg, x=pc.display.width/2, y=pc.display.height/2, bg=0x000000, fg=0xffffff, scale=2):
+  text_area = adafruit_display_text.label.Label(terminalio.FONT, text=msg, color=fg, background_color=bg, scale=scale)
+  text_area.anchor_point = (0.5, 0.5)
+  text_area.anchored_position = (x, y)
+  pc.splash.append(text_area)
+  pc.display.refresh()
+  pc.splash.pop()
+
 # startup
 print("Hello World!")
 tone(300, 0.3)
@@ -134,12 +144,12 @@ while True:
   # sd card
   if pc.card_detect.fell:
     print("sd card removed")
-    pc.display_message("unmounting sd card...", color=0xffffff, scale=2)
+    display_message("unmounting sd card...")
     pc.unmount_sd_card()
     pc.display.refresh()
   if pc.card_detect.rose:
     print("sd card inserted")
-    pc.display_message("mounting sd card...", color=0xffffff, scale=2)
+    display_message("mounting sd card...")
     pc.mount_sd_card()
     pc.display.refresh()
 
@@ -170,19 +180,20 @@ while True:
 
     # focus
     if pc.shutter.long_press:
-      pc.display_message("focusing...", color=0xffffff, scale=2)
+      display_message("focusing...")
       pc.autofocus()
 
     # take photo
     if pc.shutter.short_count:
       print("taking photo")
       tone(500, 0.1)
-      pc.display_message("processing...", color=0xffffff, scale=2)
+      display_message("processing...")
       pc.capture_into_bitmap(bmp)
+      pc.led_level = 0
       process(bmp)
       tone(600, 0.1)
       group.hidden = False
-      pc.display_message("press [ok]\nto continue", color=0xffffff, scale=2)
+      display_message("press [ok]\nto continue")
       STATE = "view"
 
     if pc.up.fell:
@@ -195,16 +206,16 @@ while True:
       pc.led_color = cycle(pc.led_color, 7)
     elif pc.select.fell:
       shape = cycle(shape, len(halftones) - 1)
-      pc.display_message("shape: {}".format(shape), color=0xffffff, scale=2)
+      display_message("shape: {}".format(shape))
       time.sleep(0.5)
     elif pc.ok.fell:
       # normal / b&w
       pc.effect = toggle(pc.effect, 0, 2)
   elif STATE == "view":
     if pc.ok.fell:
-      pc.display_message("saving...", color=0xffffff, scale=2)
+      display_message("saving...")
       adafruit_bitmapsaver.save_pixels("/sd/{}.bmp".format(time.time()), cmy, pal_cmy)
-      pc.display_message("photo saved\nto sd card", color=0xffffff, scale=2)
+      display_message("photo saved\nto sd card")
       time.sleep(0.5)
       STATE = "take"
     # scroll to see full photo
