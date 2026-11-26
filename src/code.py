@@ -6,6 +6,7 @@ import displayio
 import terminalio
 import bitmaptools
 import bitmapfilter
+import math
 import time
 
 # camera settings
@@ -19,8 +20,20 @@ display = board.DISPLAY
 
 # bitmap - RGB565_SWAPPED
 bmp = displayio.Bitmap(pc.camera.width, pc.camera.height, 65535)
-cmy = displayio.Bitmap(pc.camera.width * SCALE_FACTOR, pc.camera.height * SCALE_FACTOR, 8)
 cc = displayio.ColorConverter(input_colorspace=displayio.Colorspace.RGB565_SWAPPED)
+
+scale_w = pc.camera.width * SCALE_FACTOR
+scale_h = pc.camera.height * SCALE_FACTOR
+roto_w = math.ceil(scale_w * math.cos(math.pi / 12) + scale_h * math.sin(math.pi / 12))
+roto_h = math.ceil(scale_h * math.cos(math.pi / 12) + scale_w * math.sin(math.pi / 12))
+
+bmp_roto = displayio.Bitmap(roto_w, roto_h, 65535)
+values_cyan_roto = displayio.Bitmap(roto_w, roto_h, 2)
+values_magenta_roto = displayio.Bitmap(roto_w, roto_h, 2)
+values_cyan = displayio.Bitmap(roto_w, roto_h, 2)
+values_magenta = displayio.Bitmap(roto_w, roto_h, 2)
+values_yellow = displayio.Bitmap(roto_w, roto_h, 2)
+cmy = displayio.Bitmap(scale_w, scale_h, 8)
 
 pal_cmy = displayio.Palette(8)
 pal_cmy[0] = 0xf3ead9 # 000 white
@@ -70,26 +83,48 @@ def tone(freq, dur):
     pc.tone(freq, dur)
 
 def process(bitmap):
-  bitmap_scaled = displayio.Bitmap(pc.camera.width * SCALE_FACTOR, pc.camera.height * SCALE_FACTOR, 65535)
-  bitmaptools.rotozoom(bitmap_scaled, bitmap, scale = SCALE_FACTOR)
+  # convert to cmy: scale based on # of shades
+  max_idx = len(halftones[0]) * len(halftones[0][0]) - 1
 
-  for x in range(bitmap_scaled.width):
-    for y in range(bitmap_scaled.height):
-      pixel = cc.convert(bitmap_scaled[x, y])
+  # cyan layer: -15° rotation
+  bitmaptools.rotozoom(bmp_roto, bitmap, scale = SCALE_FACTOR, angle = -math.pi / 12)
+  for x in range(bmp_roto.width):
+    for y in range(bmp_roto.height):
+      pixel = cc.convert(bmp_roto[x, y])
       r = (pixel & 0b1111100000000000) >> 11
-      g = (pixel & 0b0000011111100000) >> 5
-      b = pixel & 0b0000000000011111
-      # convert to cmy: scale based on # of shades
-      max_idx = len(halftones[0]) * len(halftones[0][0]) - 1
       threshold = halftones[shape][x % 4][y % 4]
       cyan = int(max_idx * (1 - r / 31))
+      values_cyan_roto[x, y] = int(cyan >= threshold)
+  bitmaptools.rotozoom(values_cyan, values_cyan_roto, angle = math.pi / 12)
+
+  # magenta layer: +15° rotation
+  bitmaptools.rotozoom(bmp_roto, bitmap, scale = SCALE_FACTOR, angle = math.pi / 12)
+  for x in range(bmp_roto.width):
+    for y in range(bmp_roto.height):
+      pixel = cc.convert(bmp_roto[x, y])
+      g = (pixel & 0b0000011111100000) >> 5
+      threshold = halftones[shape][x % 4][y % 4]
       magenta = int(max_idx * (1 - g / 63))
+      values_magenta_roto[x, y] = int(magenta >= threshold)
+  bitmaptools.rotozoom(values_magenta, values_magenta_roto, angle = -math.pi / 12)
+
+  # yellow layer: 0° rotation
+  bitmaptools.rotozoom(bmp_roto, bitmap, scale = SCALE_FACTOR)
+  for x in range(bmp_roto.width):
+    for y in range(bmp_roto.height):
+      pixel = cc.convert(bmp_roto[x, y])
+      b = pixel & 0b0000000000011111
+      threshold = halftones[shape][x % 4][y % 4]
       yellow = int(max_idx * (1 - b / 31))
-      vc = int(cyan >= threshold)
-      vm = int(magenta >= threshold)
-      vy = int(yellow >= threshold)
-      cmy[x, y] = 4 * vc + 2 * vm + 1 * vy
-      # print(f"{x:03},{y:03} 565:{pixel:05} RGB:{r:02},{g:02},{b:02} CMY:{cyan:02},{magenta:02},{yellow:02}")
+      values_yellow[x, y] = int(yellow >= threshold)
+
+  # account for margins added to rotated bitmaps
+  sx = int((roto_w - scale_w) / 2)
+  sy = int((roto_h - scale_h) / 2)
+
+  for x in range(cmy.width):
+    for y in range(cmy.height):
+      cmy[x, y] = 4 * values_cyan[sx + x, sy + y] + 2 * values_magenta[sx + x, sy + y] + values_yellow[sx + x, sy + y]
 
 def display_message(msg, x=pc.display.width/2, y=pc.display.height/2, bg=0x000000, fg=0xffffff, scale=2):
   text_area = adafruit_display_text.label.Label(terminalio.FONT, text=msg, color=fg, background_color=bg, scale=scale)
