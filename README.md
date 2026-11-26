@@ -2,7 +2,7 @@
 
 Adafruit Memento halftone camera.
 
-![Photo taken with halftone-camera.](./pub/946684962.bmp)
+![Photo taken with halftone-camera.](./pub/946684907.bmp)
 
 ## Controls
 
