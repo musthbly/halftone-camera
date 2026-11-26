@@ -41,42 +41,9 @@ display.root_group.append(group)
 
 # halftone shapes, light to dark (0:bg, 1:fg)
 halftones = [
-  # 0 = square
-  [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-   [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-   [0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-   [0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-   [0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0],
-   [0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0],
-   [0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0],
-   [0, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0],
-   [0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0],
-   [0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0],
-   [1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0],
-   [1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0],
-   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
-   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
-   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]],
-  # 1 = line
-  [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-   [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-   [0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-   [0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0],
-   [0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0],
-   [0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0],
-   [0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 1, 0, 0, 0],
-   [0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 0],
-   [0, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0],
-   [0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0],
-   [0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0],
-   [0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
-   [0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-   [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-   [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]]
+  [[9, 8, 7, 6], [10, 1, 0, 5], [11, 2, 3, 4], [12, 13, 14, 15]], # square
+  [[15, 13, 9, 3], [12, 8, 1, 4], [7, 0, 5, 10], [2, 6, 11, 14]], # line
+  [[0, 1, 3, 6], [2, 4, 7, 10], [5, 8, 11, 13], [9, 12, 14, 15]], # triangle
 ]
 shape = 0
 
@@ -103,28 +70,26 @@ def tone(freq, dur):
     pc.tone(freq, dur)
 
 def process(bitmap):
-  # halftone dimensions
-  sz = int(len(halftones[0][0]) ** 0.5)
-  for x in range(bitmap.width / sz * SCALE_FACTOR):
-    for y in range(bitmap.height / sz * SCALE_FACTOR):
-      # top left coord of square from original bitmap
-      rx = int(sz * x / SCALE_FACTOR)
-      ry = int(sz * y / SCALE_FACTOR)
-      total = 0
-      # convert swapped to RGB565
-      pixel = cc.convert(bitmap[rx, ry])
+  bitmap_scaled = displayio.Bitmap(pc.camera.width * SCALE_FACTOR, pc.camera.height * SCALE_FACTOR, 65535)
+  bitmaptools.rotozoom(bitmap_scaled, bitmap, scale = SCALE_FACTOR)
+
+  for x in range(bitmap_scaled.width):
+    for y in range(bitmap_scaled.height):
+      pixel = cc.convert(bitmap_scaled[x, y])
       r = (pixel & 0b1111100000000000) >> 11
       g = (pixel & 0b0000011111100000) >> 5
       b = pixel & 0b0000000000011111
       # convert to cmy: scale based on # of shades
-      max_idx = len(halftones[0]) - 1
+      max_idx = len(halftones[0]) * len(halftones[0][0]) - 1
+      threshold = halftones[shape][x % 4][y % 4]
       cyan = int(max_idx * (1 - r / 31))
       magenta = int(max_idx * (1 - g / 63))
       yellow = int(max_idx * (1 - b / 31))
-
-      square = [4 * vc + 2 * vm + 1 * vy for vc, vm, vy in zip(halftones[shape][cyan], halftones[shape][magenta], halftones[shape][yellow])]
-      bitmaptools.arrayblit(cmy, bytes(square), rx * SCALE_FACTOR, ry * SCALE_FACTOR, int(rx * SCALE_FACTOR + sz), int(ry * SCALE_FACTOR + sz))
-      print(f"{x:03},{y:02} 565:{pixel:05} RGB:{r:02},{g:02},{b:02} CMY:{cyan:02},{magenta:02},{yellow:02} {str(square).replace(' ','')}")
+      vc = int(cyan >= threshold)
+      vm = int(magenta >= threshold)
+      vy = int(yellow >= threshold)
+      cmy[x, y] = 4 * vc + 2 * vm + 1 * vy
+      # print(f"{x:03},{y:03} 565:{pixel:05} RGB:{r:02},{g:02},{b:02} CMY:{cyan:02},{magenta:02},{yellow:02}")
 
 def display_message(msg, x=pc.display.width/2, y=pc.display.height/2, bg=0x000000, fg=0xffffff, scale=2):
   text_area = adafruit_display_text.label.Label(terminalio.FONT, text=msg, color=fg, background_color=bg, scale=scale)
