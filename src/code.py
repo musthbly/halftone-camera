@@ -205,18 +205,20 @@ while True:
     if pc.up.fell:
       pc.led_level = cycle(pc.led_level, 4)
     elif pc.down.fell:
-      pc.led_level = cycle(pc.led_level, 4, True)
+      # normal / b&w
+      pc.effect = toggle(pc.effect, 0, 2)
     elif pc.left.fell:
       pc.led_color = cycle(pc.led_color, 7, True)
     elif pc.right.fell:
-      pc.led_color = cycle(pc.led_color, 7)
-    elif pc.select.fell:
       shape = cycle(shape, len(halftones) - 1)
       display_message("shape: {}".format(shape))
       time.sleep(0.5)
+    elif pc.select.fell:
+      # camera roll
+      pass
     elif pc.ok.fell:
-      # normal / b&w
-      pc.effect = toggle(pc.effect, 0, 2)
+      # camera settings
+      pass
   elif STATE == "view":
     if pc.ok.fell:
       display_message("saving...")

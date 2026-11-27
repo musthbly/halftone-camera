@@ -8,10 +8,12 @@ Adafruit Memento halftone camera.
 
 ### Camera mode
 
-- `ok`: Toggle black and white filter
-- `select`: Change halftone shape
-- `up` / `down`: Change LED brightness
-- `left` / `right`: Change LED color
+- `up`: Change LED brightness
+- `down`: Toggle black and white filter
+- `left`: Change LED color
+- `right`: Change halftone shape
+- `select`: See camera roll (TODO)
+- `ok`: See camera settings (TODO)
 - `shutter_long`: Autofocus
 - `shutter_short`: Take photo
 
