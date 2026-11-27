@@ -28,8 +28,7 @@ roto_w = math.ceil(scale_w * math.cos(math.pi / 12) + scale_h * math.sin(math.pi
 roto_h = math.ceil(scale_h * math.cos(math.pi / 12) + scale_w * math.sin(math.pi / 12))
 
 bmp_roto = displayio.Bitmap(roto_w, roto_h, 65535)
-values_cyan_roto = displayio.Bitmap(roto_w, roto_h, 2)
-values_magenta_roto = displayio.Bitmap(roto_w, roto_h, 2)
+values_roto = displayio.Bitmap(roto_w, roto_h, 2)
 values_cyan = displayio.Bitmap(roto_w, roto_h, 2)
 values_magenta = displayio.Bitmap(roto_w, roto_h, 2)
 values_yellow = displayio.Bitmap(roto_w, roto_h, 2)
@@ -52,7 +51,7 @@ group = displayio.Group(y=32)
 group.append(tile_cmy)
 display.root_group.append(group)
 
-# halftone shapes, light to dark (0:bg, 1:fg)
+# halftone threshold matrices
 halftones = [
   [[9, 8, 7, 6], [10, 1, 0, 5], [11, 2, 3, 4], [12, 13, 14, 15]], # square
   [[15, 13, 9, 3], [12, 8, 1, 4], [7, 0, 5, 10], [2, 6, 11, 14]], # line
@@ -94,8 +93,8 @@ def process(bitmap):
       r = (pixel & 0b1111100000000000) >> 11
       threshold = halftones[shape][x % 4][y % 4]
       cyan = int(max_idx * (1 - r / 31))
-      values_cyan_roto[x, y] = int(cyan >= threshold)
-  bitmaptools.rotozoom(values_cyan, values_cyan_roto, angle = math.pi / 12)
+      values_roto[x, y] = int(cyan >= threshold)
+  bitmaptools.rotozoom(values_cyan, values_roto, angle = math.pi / 12)
 
   # magenta layer: +15° rotation
   bitmaptools.rotozoom(bmp_roto, bitmap, scale = SCALE_FACTOR, angle = math.pi / 12)
@@ -105,8 +104,8 @@ def process(bitmap):
       g = (pixel & 0b0000011111100000) >> 5
       threshold = halftones[shape][x % 4][y % 4]
       magenta = int(max_idx * (1 - g / 63))
-      values_magenta_roto[x, y] = int(magenta >= threshold)
-  bitmaptools.rotozoom(values_magenta, values_magenta_roto, angle = -math.pi / 12)
+      values_roto[x, y] = int(magenta >= threshold)
+  bitmaptools.rotozoom(values_magenta, values_roto, angle = -math.pi / 12)
 
   # yellow layer: 0° rotation
   bitmaptools.rotozoom(bmp_roto, bitmap, scale = SCALE_FACTOR)
