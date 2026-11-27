@@ -7,6 +7,7 @@ import terminalio
 import bitmaptools
 import bitmapfilter
 import math
+import os
 import time
 
 # camera settings
@@ -15,6 +16,12 @@ pc.resolution = 0 # 240x240
 MUTED = False
 SCALE_FACTOR = 2 # halftoned image is scaled up
 STATE = "take" # take, view
+
+photos = []
+for filename in os.listdir("/sd"):
+  if filename.lower().endswith(".bmp") and not filename.startswith("._"):
+    photos.append(f"/sd/{filename}")
+photos.sort()
 
 display = board.DISPLAY
 
@@ -213,8 +220,11 @@ while True:
   elif STATE == "view":
     if pc.ok.fell:
       display_message("saving...")
-      adafruit_bitmapsaver.save_pixels("/sd/{}.bmp".format(time.time()), cmy, pal_cmy)
-      display_message("photo saved\nto sd card")
+      # get number: remove /sd/ and .bmp from filename
+      file_num = int(photos[-1][4:-4]) + 1
+      adafruit_bitmapsaver.save_pixels(f"/sd/{file_num:04}.bmp", cmy, pal_cmy)
+      photos.append(f"/sd/{file_num:04}.bmp")
+      display_message(f"saved as\n{file_num:04}.bmp")
       time.sleep(0.5)
       STATE = "take"
     # scroll to see full photo
