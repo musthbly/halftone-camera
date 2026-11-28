@@ -15,13 +15,19 @@ pc = adafruit_pycamera.PyCamera()
 pc.resolution = 0 # 240x240
 MUTED = False
 SCALE_FACTOR = 2 # halftoned image is scaled up
-STATE = "take" # take, view
+ROLL_IDX = 0
+HALFTONE_SHAPE = 0
+STATE = "take" # take, view, roll
 
 photos = []
 for filename in os.listdir("/sd"):
   if filename.lower().endswith(".bmp") and not filename.startswith("._"):
     photos.append(f"/sd/{filename}")
 photos.sort()
+
+thumbnails = []
+for filename in photos:
+  thumbnails.append(displayio.OnDiskBitmap(f"{filename}.thumb"))
 
 display = board.DISPLAY
 
@@ -40,6 +46,7 @@ values_cyan = displayio.Bitmap(roto_w, roto_h, 2)
 values_magenta = displayio.Bitmap(roto_w, roto_h, 2)
 values_yellow = displayio.Bitmap(roto_w, roto_h, 2)
 cmy = displayio.Bitmap(scale_w, scale_h, 8)
+cmy_thumb = displayio.Bitmap(int(pc.camera.width / 4), int(pc.camera.height / 4), 8)
 
 pal_cmy = displayio.Palette(8)
 pal_cmy[0] = 0xf3ead9 # 000 white
@@ -51,20 +58,43 @@ pal_cmy[5] = 0x58a600 # 101 green
 pal_cmy[6] = 0x5300bb # 110 blue
 pal_cmy[7] = 0x25151d # 111 black
 
-# divide photo into SCALE_FACTOR * SCALE_FACTOR grid
-tile_cmy = displayio.TileGrid(cmy, pixel_shader=pal_cmy, width=1, height=1, tile_width=pc.camera.width, tile_height=pc.camera.height)
-
-group = displayio.Group(y=32)
-group.append(tile_cmy)
-display.root_group.append(group)
-
 # halftone threshold matrices
 halftones = [
   [[9, 8, 7, 6], [10, 1, 0, 5], [11, 2, 3, 4], [12, 13, 14, 15]], # square
   [[15, 13, 9, 3], [12, 8, 1, 4], [7, 0, 5, 10], [2, 6, 11, 14]], # line
   [[0, 1, 3, 6], [2, 4, 7, 10], [5, 8, 11, 13], [9, 12, 14, 15]], # triangle
 ]
-shape = 0
+
+groups = {
+  "view": displayio.Group(y=32),
+  "roll": displayio.Group(),
+}
+
+# divide photo into SCALE_FACTOR * SCALE_FACTOR grid
+tile_cmy = displayio.TileGrid(cmy, pixel_shader=pal_cmy, width=1, height=1, tile_width=pc.camera.width, tile_height=pc.camera.height)
+groups["view"].append(tile_cmy)
+
+grid_list = adafruit_display_text.label.Label(terminalio.FONT, text="", color=0xffffff, background_color=0x000000, scale=2)
+grid_list.anchor_point = (0, 0.5)
+grid_list.anchored_position = (8, pc.display.height / 2)
+groups["roll"].append(grid_list)
+
+grid_current = adafruit_display_text.label.Label(terminalio.FONT, text="", color=0x000000, background_color=0xffffff, scale=2)
+grid_current.anchor_point = (0, 0.5)
+grid_current.anchored_position = (8, pc.display.height / 2)
+groups["roll"].append(grid_current)
+
+grid_thumb = thumbnails[ROLL_IDX]
+tile_thumb = displayio.TileGrid(grid_thumb, pixel_shader=displayio.ColorConverter(input_colorspace=displayio.Colorspace.RGB888), x=120, y=96)
+groups["roll"].append(tile_thumb)
+
+for k, group in groups.items():
+  print(group)
+  if k == STATE:
+    group.hidden = False
+  else:
+    group.hidden = True
+  display.root_group.append(group)
 
 def cycle(cur, max, reverse = False):
   if reverse:
@@ -88,6 +118,24 @@ def tone(freq, dur):
   if not MUTED:
     pc.tone(freq, dur)
 
+def display_message(msg, x=pc.display.width/2, y=pc.display.height/2, bg=0x000000, fg=0xffffff, scale=2):
+  text_area = adafruit_display_text.label.Label(terminalio.FONT, text=msg, color=fg, background_color=bg, scale=scale)
+  text_area.anchor_point = (0.5, 0.5)
+  text_area.anchored_position = (x, y)
+  pc.splash.append(text_area)
+  pc.display.refresh()
+  pc.splash.pop()
+
+def set_state(state):
+  global STATE
+  STATE = state
+  for k, group in groups.items():
+    if k == STATE:
+      group.hidden = False
+    else:
+      group.hidden = True
+  display.refresh()
+
 def process(bitmap):
   # convert to cmy: scale based on # of shades
   max_idx = len(halftones[0]) * len(halftones[0][0]) - 1
@@ -98,7 +146,7 @@ def process(bitmap):
     for y in range(bmp_roto.height):
       pixel = cc.convert(bmp_roto[x, y])
       r = (pixel & 0b1111100000000000) >> 11
-      threshold = halftones[shape][x % 4][y % 4]
+      threshold = halftones[HALFTONE_SHAPE][x % 4][y % 4]
       cyan = int(max_idx * (1 - r / 31))
       values_roto[x, y] = int(cyan >= threshold)
   bitmaptools.rotozoom(values_cyan, values_roto, angle = math.pi / 12)
@@ -109,7 +157,7 @@ def process(bitmap):
     for y in range(bmp_roto.height):
       pixel = cc.convert(bmp_roto[x, y])
       g = (pixel & 0b0000011111100000) >> 5
-      threshold = halftones[shape][x % 4][y % 4]
+      threshold = halftones[HALFTONE_SHAPE][x % 4][y % 4]
       magenta = int(max_idx * (1 - g / 63))
       values_roto[x, y] = int(magenta >= threshold)
   bitmaptools.rotozoom(values_magenta, values_roto, angle = -math.pi / 12)
@@ -120,7 +168,7 @@ def process(bitmap):
     for y in range(bmp_roto.height):
       pixel = cc.convert(bmp_roto[x, y])
       b = pixel & 0b0000000000011111
-      threshold = halftones[shape][x % 4][y % 4]
+      threshold = halftones[HALFTONE_SHAPE][x % 4][y % 4]
       yellow = int(max_idx * (1 - b / 31))
       values_yellow[x, y] = int(yellow >= threshold)
 
@@ -131,14 +179,6 @@ def process(bitmap):
   for x in range(cmy.width):
     for y in range(cmy.height):
       cmy[x, y] = 4 * values_cyan[sx + x, sy + y] + 2 * values_magenta[sx + x, sy + y] + values_yellow[sx + x, sy + y]
-
-def display_message(msg, x=pc.display.width/2, y=pc.display.height/2, bg=0x000000, fg=0xffffff, scale=2):
-  text_area = adafruit_display_text.label.Label(terminalio.FONT, text=msg, color=fg, background_color=bg, scale=scale)
-  text_area.anchor_point = (0.5, 0.5)
-  text_area.anchored_position = (x, y)
-  pc.splash.append(text_area)
-  pc.display.refresh()
-  pc.splash.pop()
 
 # startup
 print("Hello World!")
@@ -182,8 +222,6 @@ while True:
     # preview
     pc.blit(pc.continuous_capture())
 
-    group.hidden = True
-
     # focus
     if pc.shutter.long_press:
       display_message("focusing...")
@@ -198,9 +236,7 @@ while True:
       pc.led_level = 0
       process(bmp)
       tone(600, 0.1)
-      group.hidden = False
-      display_message("press [ok]\nto continue")
-      STATE = "view"
+      set_state("view")
 
     if pc.up.fell:
       pc.led_level = cycle(pc.led_level, 4)
@@ -210,12 +246,12 @@ while True:
     elif pc.left.fell:
       pc.led_color = cycle(pc.led_color, 7, True)
     elif pc.right.fell:
-      shape = cycle(shape, len(halftones) - 1)
-      display_message("shape: {}".format(shape))
+      HALFTONE_SHAPE = cycle(HALFTONE_SHAPE, len(halftones) - 1)
+      display_message("shape: {}".format(HALFTONE_SHAPE))
       time.sleep(0.5)
     elif pc.select.fell:
       # camera roll
-      pass
+      set_state("roll")
     elif pc.ok.fell:
       # camera settings
       pass
@@ -226,9 +262,12 @@ while True:
       file_num = int(photos[-1][4:-4]) + 1
       adafruit_bitmapsaver.save_pixels(f"/sd/{file_num:04}.bmp", cmy, pal_cmy)
       photos.append(f"/sd/{file_num:04}.bmp")
+      bitmaptools.rotozoom(cmy_thumb, cmy, scale = 0.25 / SCALE_FACTOR)
+      adafruit_bitmapsaver.save_pixels(f"/sd/{file_num:04}.bmp.thumb", cmy_thumb, pal_cmy)
+      thumbnails.append(displayio.OnDiskBitmap(f"/sd/{file_num:04}.bmp.thumb"))
       display_message(f"saved as\n{file_num:04}.bmp")
       time.sleep(0.5)
-      STATE = "take"
+      set_state("take")
     # scroll to see full photo
     elif pc.up.fell:
       if tile_cmy[0] >= SCALE_FACTOR:
@@ -246,3 +285,19 @@ while True:
       if tile_cmy[0] % SCALE_FACTOR != SCALE_FACTOR - 1:
         tile_cmy[0] += 1
         display.refresh()
+  elif STATE == "roll":
+    display.refresh()
+    current = photos[ROLL_IDX]
+    prev_idx = (ROLL_IDX - 1) % len(photos)
+    next_idx = (ROLL_IDX + 1) % len(photos)
+    grid_list.text = f"{photos[prev_idx][4:]}\n\n{photos[next_idx][4:]}"
+    grid_current.text = f"{photos[ROLL_IDX][4:]}"
+    tile_thumb.bitmap = thumbnails[ROLL_IDX]
+    display.refresh()
+
+    if pc.ok.fell:
+      set_state("take")
+    elif pc.up.fell:
+      ROLL_IDX = cycle(ROLL_IDX, len(photos) - 1, True)
+    elif pc.down.fell:
+      ROLL_IDX = cycle(ROLL_IDX, len(photos) - 1)
