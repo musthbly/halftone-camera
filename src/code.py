@@ -18,6 +18,7 @@ SCALE_FACTOR = 2 # halftoned image is scaled up
 ROLL_IDX = 0
 HALFTONE_SHAPE = 0
 STATE = "take" # take, view, roll
+PREV_STATE = ""
 
 photos = []
 for filename in os.listdir("/sd"):
@@ -27,13 +28,17 @@ photos.sort()
 
 thumbnails = []
 for filename in photos:
-  thumbnails.append(displayio.OnDiskBitmap(f"{filename}.thumb"))
+  try:
+    thumbnails.append(displayio.OnDiskBitmap(f"{filename}.thumb"))
+  except:
+    thumbnails.append(displayio.OnDiskBitmap(f"/placeholder-thumbnail.bmp"))
 
 display = board.DISPLAY
 
 # bitmap - RGB565_SWAPPED
 bmp = displayio.Bitmap(pc.camera.width, pc.camera.height, 65535)
-cc = displayio.ColorConverter(input_colorspace=displayio.Colorspace.RGB565_SWAPPED)
+cc_swapped = displayio.ColorConverter(input_colorspace=displayio.Colorspace.RGB565_SWAPPED)
+cc_888 = displayio.ColorConverter(input_colorspace=displayio.Colorspace.RGB888)
 
 scale_w = pc.camera.width * SCALE_FACTOR
 scale_h = pc.camera.height * SCALE_FACTOR
@@ -71,8 +76,8 @@ groups = {
 }
 
 # divide photo into SCALE_FACTOR * SCALE_FACTOR grid
-tile_cmy = displayio.TileGrid(cmy, pixel_shader=pal_cmy, width=1, height=1, tile_width=pc.camera.width, tile_height=pc.camera.height)
-groups["view"].append(tile_cmy)
+tile_view = displayio.TileGrid(cmy, pixel_shader=pal_cmy, width=1, height=1, tile_width=pc.camera.width, tile_height=pc.camera.height)
+groups["view"].append(tile_view)
 
 grid_list = adafruit_display_text.label.Label(terminalio.FONT, text="", color=0xffffff, background_color=0x000000, scale=2)
 grid_list.anchor_point = (0, 0.5)
@@ -85,7 +90,7 @@ grid_current.anchored_position = (8, pc.display.height / 2)
 groups["roll"].append(grid_current)
 
 grid_thumb = thumbnails[ROLL_IDX]
-tile_thumb = displayio.TileGrid(grid_thumb, pixel_shader=displayio.ColorConverter(input_colorspace=displayio.Colorspace.RGB888), x=120, y=96)
+tile_thumb = displayio.TileGrid(grid_thumb, pixel_shader=cc_888, x=120, y=96)
 groups["roll"].append(tile_thumb)
 
 for k, group in groups.items():
@@ -126,15 +131,27 @@ def display_message(msg, x=pc.display.width/2, y=pc.display.height/2, bg=0x00000
   pc.display.refresh()
   pc.splash.pop()
 
-def set_state(state):
+def set_state(state, fn = None):
   global STATE
+  global PREV_STATE
+  PREV_STATE = STATE
   STATE = state
   for k, group in groups.items():
     if k == STATE:
       group.hidden = False
     else:
       group.hidden = True
+  if fn:
+    fn()
   display.refresh()
+
+def set_view_bitmap():
+  if PREV_STATE == "take":
+    tile_view.bitmap = cmy
+    tile_view.pixel_shader = pal_cmy
+  elif PREV_STATE == "roll":
+    tile_view.bitmap = displayio.OnDiskBitmap(photos[ROLL_IDX])
+    tile_view.pixel_shader = cc_888
 
 def process(bitmap):
   # convert to cmy: scale based on # of shades
@@ -144,7 +161,7 @@ def process(bitmap):
   bitmaptools.rotozoom(bmp_roto, bitmap, scale = SCALE_FACTOR, angle = -math.pi / 12)
   for x in range(bmp_roto.width):
     for y in range(bmp_roto.height):
-      pixel = cc.convert(bmp_roto[x, y])
+      pixel = cc_swapped.convert(bmp_roto[x, y])
       r = (pixel & 0b1111100000000000) >> 11
       threshold = halftones[HALFTONE_SHAPE][x % 4][y % 4]
       cyan = int(max_idx * (1 - r / 31))
@@ -155,7 +172,7 @@ def process(bitmap):
   bitmaptools.rotozoom(bmp_roto, bitmap, scale = SCALE_FACTOR, angle = math.pi / 12)
   for x in range(bmp_roto.width):
     for y in range(bmp_roto.height):
-      pixel = cc.convert(bmp_roto[x, y])
+      pixel = cc_swapped.convert(bmp_roto[x, y])
       g = (pixel & 0b0000011111100000) >> 5
       threshold = halftones[HALFTONE_SHAPE][x % 4][y % 4]
       magenta = int(max_idx * (1 - g / 63))
@@ -166,7 +183,7 @@ def process(bitmap):
   bitmaptools.rotozoom(bmp_roto, bitmap, scale = SCALE_FACTOR)
   for x in range(bmp_roto.width):
     for y in range(bmp_roto.height):
-      pixel = cc.convert(bmp_roto[x, y])
+      pixel = cc_swapped.convert(bmp_roto[x, y])
       b = pixel & 0b0000000000011111
       threshold = halftones[HALFTONE_SHAPE][x % 4][y % 4]
       yellow = int(max_idx * (1 - b / 31))
@@ -236,7 +253,7 @@ while True:
       pc.led_level = 0
       process(bmp)
       tone(600, 0.1)
-      set_state("view")
+      set_state("view", set_view_bitmap)
 
     if pc.up.fell:
       pc.led_level = cycle(pc.led_level, 4)
@@ -256,34 +273,38 @@ while True:
       # camera settings
       pass
   elif STATE == "view":
-    if pc.ok.fell:
-      display_message("saving...")
-      # get number: remove /sd/ and .bmp from filename
-      file_num = int(photos[-1][4:-4]) + 1
-      adafruit_bitmapsaver.save_pixels(f"/sd/{file_num:04}.bmp", cmy, pal_cmy)
-      photos.append(f"/sd/{file_num:04}.bmp")
-      bitmaptools.rotozoom(cmy_thumb, cmy, scale = 0.25 / SCALE_FACTOR)
-      adafruit_bitmapsaver.save_pixels(f"/sd/{file_num:04}.bmp.thumb", cmy_thumb, pal_cmy)
-      thumbnails.append(displayio.OnDiskBitmap(f"/sd/{file_num:04}.bmp.thumb"))
-      display_message(f"saved as\n{file_num:04}.bmp")
-      time.sleep(0.5)
-      set_state("take")
+    if pc.ok.fell or pc.select.fell:
+      if PREV_STATE == "take":
+        display_message("saving...")
+        # get number: remove /sd/ and .bmp from filename
+        file_num = int(photos[-1][4:-4]) + 1
+        adafruit_bitmapsaver.save_pixels(f"/sd/{file_num:04}.bmp", cmy, pal_cmy)
+        photos.append(f"/sd/{file_num:04}.bmp")
+        bitmaptools.rotozoom(cmy_thumb, cmy, scale = 0.25 / SCALE_FACTOR)
+        adafruit_bitmapsaver.save_pixels(f"/sd/{file_num:04}.bmp.thumb", cmy_thumb, pal_cmy)
+        thumbnails.append(displayio.OnDiskBitmap(f"/sd/{file_num:04}.bmp.thumb"))
+        display_message(f"saved as\n{file_num:04}.bmp")
+        time.sleep(0.5)
+      if pc.ok.fell:
+        set_state("take")
+      elif pc.select.fell:
+        set_state("roll")
     # scroll to see full photo
     elif pc.up.fell:
-      if tile_cmy[0] >= SCALE_FACTOR:
-        tile_cmy[0] -= SCALE_FACTOR
+      if tile_view[0] >= SCALE_FACTOR:
+        tile_view[0] -= SCALE_FACTOR
         display.refresh()
     elif pc.down.fell:
-      if tile_cmy[0] <= (SCALE_FACTOR ** 2 - SCALE_FACTOR - 1):
-        tile_cmy[0] += SCALE_FACTOR
+      if tile_view[0] <= (SCALE_FACTOR ** 2 - SCALE_FACTOR - 1):
+        tile_view[0] += SCALE_FACTOR
         display.refresh()
     elif pc.left.fell:
-      if tile_cmy[0] % SCALE_FACTOR != 0:
-        tile_cmy[0] -= 1
+      if tile_view[0] % SCALE_FACTOR != 0:
+        tile_view[0] -= 1
         display.refresh()
     elif pc.right.fell:
-      if tile_cmy[0] % SCALE_FACTOR != SCALE_FACTOR - 1:
-        tile_cmy[0] += 1
+      if tile_view[0] % SCALE_FACTOR != SCALE_FACTOR - 1:
+        tile_view[0] += 1
         display.refresh()
   elif STATE == "roll":
     display.refresh()
@@ -297,6 +318,8 @@ while True:
 
     if pc.ok.fell:
       set_state("take")
+    elif pc.select.fell:
+      set_state("view", set_view_bitmap)
     elif pc.up.fell:
       ROLL_IDX = cycle(ROLL_IDX, len(photos) - 1, True)
     elif pc.down.fell:
