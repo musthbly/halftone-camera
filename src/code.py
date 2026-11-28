@@ -65,9 +65,25 @@ pal_cmy[7] = 0x25151d # 111 black
 
 # halftone threshold matrices
 halftones = [
-  [[9, 8, 7, 6], [10, 1, 0, 5], [11, 2, 3, 4], [12, 13, 14, 15]], # square
-  [[15, 13, 9, 3], [12, 8, 1, 4], [7, 0, 5, 10], [2, 6, 11, 14]], # line
-  [[0, 1, 3, 6], [2, 4, 7, 10], [5, 8, 11, 13], [9, 12, 14, 15]], # triangle
+  [
+    [9, 8, 7, 6],
+    [10, 1, 0, 5],
+    [11, 2, 3, 4],
+    [12, 13, 14, 15],
+  ], # square4
+  [
+    [12, 11, 10, 9, 24],
+    [13, 2, 1, 8, 23],
+    [14, 3, 0, 7, 22],
+    [15, 4, 5, 6, 21],
+    [16, 17, 18, 19, 20],
+  ], # square5
+  [
+    [0, 8, 2, 10],
+    [12, 4, 14, 6],
+    [3, 11, 1, 9],
+    [15, 7, 13, 5],
+  ], # bayer4
 ]
 
 groups = {
@@ -154,8 +170,10 @@ def set_view_bitmap():
     tile_view.pixel_shader = cc_888
 
 def process(bitmap):
+  ht_w = len(halftones[HALFTONE_SHAPE][0])
+  ht_h = len(halftones[HALFTONE_SHAPE])
   # convert to cmy: scale based on # of shades
-  max_idx = len(halftones[0]) * len(halftones[0][0]) - 1
+  ht_sz = ht_w * ht_h
 
   # cyan layer: -15° rotation
   bitmaptools.rotozoom(bmp_roto, bitmap, scale = SCALE_FACTOR, angle = -math.pi / 12)
@@ -163,8 +181,8 @@ def process(bitmap):
     for y in range(bmp_roto.height):
       pixel = cc_swapped.convert(bmp_roto[x, y])
       r = (pixel & 0b1111100000000000) >> 11
-      threshold = halftones[HALFTONE_SHAPE][x % 4][y % 4]
-      cyan = int(max_idx * (1 - r / 31))
+      threshold = halftones[HALFTONE_SHAPE][y % ht_h][x % ht_w]
+      cyan = int(ht_sz * (1 - r / 31))
       values_roto[x, y] = int(cyan >= threshold)
   bitmaptools.rotozoom(values_cyan, values_roto, angle = math.pi / 12)
 
@@ -174,8 +192,8 @@ def process(bitmap):
     for y in range(bmp_roto.height):
       pixel = cc_swapped.convert(bmp_roto[x, y])
       g = (pixel & 0b0000011111100000) >> 5
-      threshold = halftones[HALFTONE_SHAPE][x % 4][y % 4]
-      magenta = int(max_idx * (1 - g / 63))
+      threshold = halftones[HALFTONE_SHAPE][y % ht_h][x % ht_w]
+      magenta = int(ht_sz * (1 - g / 63))
       values_roto[x, y] = int(magenta >= threshold)
   bitmaptools.rotozoom(values_magenta, values_roto, angle = -math.pi / 12)
 
@@ -185,8 +203,8 @@ def process(bitmap):
     for y in range(bmp_roto.height):
       pixel = cc_swapped.convert(bmp_roto[x, y])
       b = pixel & 0b0000000000011111
-      threshold = halftones[HALFTONE_SHAPE][x % 4][y % 4]
-      yellow = int(max_idx * (1 - b / 31))
+      threshold = halftones[HALFTONE_SHAPE][y % ht_h][x % ht_w]
+      yellow = int(ht_sz * (1 - b / 31))
       values_yellow[x, y] = int(yellow >= threshold)
 
   # account for margins added to rotated bitmaps
