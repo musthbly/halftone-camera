@@ -37,6 +37,7 @@ display = board.DISPLAY
 
 # bitmap - RGB565_SWAPPED
 bmp = displayio.Bitmap(pc.camera.width, pc.camera.height, 65535)
+bmp_thumb = displayio.Bitmap(int(pc.camera.width / 4), int(pc.camera.height / 4), 65535)
 cc_swapped = displayio.ColorConverter(input_colorspace=displayio.Colorspace.RGB565_SWAPPED)
 cc_888 = displayio.ColorConverter(input_colorspace=displayio.Colorspace.RGB888)
 
@@ -51,7 +52,6 @@ values_cyan = displayio.Bitmap(roto_w, roto_h, 2)
 values_magenta = displayio.Bitmap(roto_w, roto_h, 2)
 values_yellow = displayio.Bitmap(roto_w, roto_h, 2)
 cmy = displayio.Bitmap(scale_w, scale_h, 8)
-cmy_thumb = displayio.Bitmap(int(pc.camera.width / 4), int(pc.camera.height / 4), 8)
 
 pal_cmy = displayio.Palette(8)
 pal_cmy[0] = 0xf3ead9 # 000 white
@@ -71,12 +71,12 @@ halftones = [
 ]
 
 groups = {
-  "view": displayio.Group(y=32),
+  "view": displayio.Group(),
   "roll": displayio.Group(),
 }
 
 # divide photo into SCALE_FACTOR * SCALE_FACTOR grid
-tile_view = displayio.TileGrid(cmy, pixel_shader=pal_cmy, width=1, height=1, tile_width=pc.camera.width, tile_height=pc.camera.height)
+tile_view = displayio.TileGrid(cmy, pixel_shader=pal_cmy, width=1, height=1, tile_width=pc.camera.width, tile_height=pc.camera.height, y=32) # center tile vertically on screen
 groups["view"].append(tile_view)
 
 grid_list = adafruit_display_text.label.Label(terminalio.FONT, text="", color=0xffffff, background_color=0x000000, scale=2)
@@ -251,6 +251,7 @@ while True:
       display_message("processing...")
       pc.capture_into_bitmap(bmp)
       pc.led_level = 0
+      bitmaptools.rotozoom(bmp_thumb, bmp, scale = 0.25)
       process(bmp)
       tone(600, 0.1)
       set_state("view", set_view_bitmap)
@@ -280,8 +281,7 @@ while True:
         file_num = int(photos[-1][4:-4]) + 1
         adafruit_bitmapsaver.save_pixels(f"/sd/{file_num:04}.bmp", cmy, pal_cmy)
         photos.append(f"/sd/{file_num:04}.bmp")
-        bitmaptools.rotozoom(cmy_thumb, cmy, scale = 0.25 / SCALE_FACTOR)
-        adafruit_bitmapsaver.save_pixels(f"/sd/{file_num:04}.bmp.thumb", cmy_thumb, pal_cmy)
+        adafruit_bitmapsaver.save_pixels(f"/sd/{file_num:04}.bmp.thumb", bmp_thumb, cc_swapped)
         thumbnails.append(displayio.OnDiskBitmap(f"/sd/{file_num:04}.bmp.thumb"))
         display_message(f"saved as\n{file_num:04}.bmp")
         time.sleep(0.5)
